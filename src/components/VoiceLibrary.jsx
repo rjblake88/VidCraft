@@ -45,13 +45,8 @@ const VoiceLibrary = () => {
       setLoading(true);
 
       // Attempt to fetch from backend (ElevenLabs proxy)
-      let backendVoices = [];
-      try {
-        const res = await api.getVoices();
-        backendVoices = res?.data?.voices ?? [];
-      } catch (e) {
-        console.error('Backend voices fetch failed, falling back to mock', e);
-      }
+      const res = await api.getVoices();
+      const backendVoices = res?.data?.voices || res?.voices || [];
 
       if (backendVoices.length) {
         const mapped = backendVoices.map((v, idx) => ({
