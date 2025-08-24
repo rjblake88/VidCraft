@@ -48,6 +48,11 @@ const VoiceLibrary = () => {
   const [stability, setStability] = useState([0.55]);
   const [clarity, setClarity] = useState([0.75]);
   const [defaultSaved, setDefaultSaved] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneName, setCloneName] = useState('');
+  const [cloneDesc, setCloneDesc] = useState('');
+  const [cloneFiles, setCloneFiles] = useState([]);
+  const [cloneSubmitting, setCloneSubmitting] = useState(false);
 
   useEffect(() => {
     fetchVoices();
@@ -285,6 +290,43 @@ const VoiceLibrary = () => {
       alert('TTS generation failed.');
     } finally {
       setTtsGenerating(false);
+    }
+  };
+
+  const handleCloneFiles = (e) => setCloneFiles(Array.from(e.target.files || []));
+  
+  const submitClone = async () => {
+    if (!cloneName || cloneFiles.length === 0) return alert('Please enter a name and select audio files');
+    setCloneSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append('name', cloneName);
+      if (cloneDesc) fd.append('description', cloneDesc);
+      cloneFiles.forEach(f => fd.append('files', f));
+      const resp = await api.cloneVoiceUpload(fd);
+      if (resp?.success) {
+        const newId = resp?.data?.voice_id;
+        setCloneOpen(false);
+        setCloneName(''); setCloneDesc(''); setCloneFiles([]);
+        await fetchVoices();
+        const newVoice = voices.find(v => v.id === newId);
+        if (newVoice) {
+          setTtsVoice(newVoice);
+          setTtsText('');
+          setTtsAudioUrl('');
+          setStability([0.55]); setClarity([0.75]); setDefaultSaved(false);
+          setTtsOpen(true);
+        } else {
+          alert('Voice cloned! It may take a moment to appear.');
+        }
+      } else {
+        alert(resp?.message || 'Failed to clone voice.');
+      }
+    } catch (e) {
+      console.error('Clone failed', e);
+      alert('Voice cloning failed.');
+    } finally {
+      setCloneSubmitting(false);
     }
   };
 
@@ -553,7 +595,10 @@ const VoiceLibrary = () => {
               Upload audio samples to create custom voice clones. Perfect for brand consistency and personalized content.
             </p>
             <div className="space-y-4 max-w-sm mx-auto">
-              <Button className="w-full gradient-bg text-white hover:opacity-90">
+              <Button 
+                className="w-full gradient-bg text-white hover:opacity-90"
+                onClick={() => setCloneOpen(true)}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Create New Voice Clone
               </Button>
@@ -612,6 +657,30 @@ const VoiceLibrary = () => {
             </div>
             <Button onClick={generateTTS} className="gradient-bg text-white" disabled={ttsGenerating}>
               {ttsGenerating ? 'Generating…' : 'Generate audio'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Dialog */}
+      <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Voice Clone</DialogTitle>
+            <DialogDescription>Upload 1–5 clear audio samples and name your voice.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input placeholder="Voice name" value={cloneName} onChange={(e)=>setCloneName(e.target.value)} />
+            <Input placeholder="Description (optional)" value={cloneDesc} onChange={(e)=>setCloneDesc(e.target.value)} />
+            <input type="file" accept="audio/*" multiple onChange={handleCloneFiles} />
+            {cloneFiles.length > 0 && (
+              <div className="text-xs text-muted-foreground">{cloneFiles.length} file(s) selected</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={()=>setCloneOpen(false)}>Cancel</Button>
+            <Button onClick={submitClone} className="gradient-bg text-white" disabled={cloneSubmitting}>
+              {cloneSubmitting ? 'Uploading…' : 'Create voice'}
             </Button>
           </DialogFooter>
         </DialogContent>

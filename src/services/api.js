@@ -102,6 +102,13 @@ class ApiService {
     return this.client.post('/voices/clone', voiceData)
   }
 
+  // Multipart voice cloning (uploads audio files)
+  async cloneVoiceUpload(formData) {
+    return this.client.post('/voices/clone', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+
   // User
   async getUserProfile() {
     return this.client.get('/users/profile')

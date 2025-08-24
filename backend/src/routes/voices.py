@@ -325,35 +325,90 @@ def generate_voice():
 
 @voices_bp.route('/clone', methods=['POST'])
 def clone_voice():
-    """Clone a voice from audio samples"""
+    """
+    Clone a new voice in ElevenLabs.
+
+    Supports two request types:
+      • multipart/form-data  -> real cloning (needs audio files)
+      • application/json     -> mock path retained for backward-compat tests
+    """
     try:
-        data = request.get_json()
-        
-        # Validate required fields
+        if not ELEVENLABS_API_KEY:
+            return jsonify({'success': False, 'message': 'ELEVENLABS_API_KEY not set on server'}), 400
+
+        # ------------------------------------------------------------------
+        # Real cloning – multipart form with files
+        # ------------------------------------------------------------------
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            name = request.form.get('name')
+            description = request.form.get('description', '')
+            files = request.files.getlist('files') or []
+
+            if not name:
+                return jsonify({'success': False, 'message': 'Missing required field: name'}), 400
+            if not files:
+                return jsonify({'success': False, 'message': 'Please upload at least one audio file'}), 400
+
+            # Build multipart payload for ElevenLabs
+            upstream_files = []
+            for f in files:
+                # read may exhaust stream; try stream.read first else f.read
+                try:
+                    upstream_files.append(
+                        ('files', (f.filename, f.stream.read(), f.mimetype or 'audio/mpeg'))
+                    )
+                except Exception:
+                    upstream_files.append(
+                        ('files', (f.filename, f.read(), f.mimetype or 'audio/mpeg'))
+                    )
+
+            data = {'name': name}
+            if description:
+                data['description'] = description
+
+            r = requests.post(
+                f"{ELEVEN_API_BASE}/voices/add",
+                headers={'xi-api-key': ELEVENLABS_API_KEY},
+                data=data,
+                files=upstream_files,
+                timeout=60,
+            )
+
+            if not r.ok:
+                return jsonify({'success': False, 'message': r.text}), r.status_code
+
+            payload = r.json()
+            voice_id = payload.get('voice_id') or payload.get('id')
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'voice_id': voice_id,
+                    'name': name,
+                    'status': payload.get('status', 'created')
+                }
+            })
+
+        # ------------------------------------------------------------------
+        # Fallback JSON mock cloning (kept for earlier callers / tests)
+        # ------------------------------------------------------------------
+        data = request.get_json(silent=True) or {}
+
         required_fields = ['name', 'description']
         for field in required_fields:
             if field not in data:
-                return jsonify({
-                    'success': False,
-                    'message': f'Missing required field: {field}'
-                }), 400
-        
-        # Mock voice cloning - in production, this would call ElevenLabs API
+                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+
         voice_id = f"cloned_voice_{int(datetime.utcnow().timestamp())}"
-        
         return jsonify({
             'success': True,
             'data': {
                 'voice_id': voice_id,
                 'name': data['name'],
                 'description': data['description'],
-                'status': 'processing',
-                'estimated_completion': '2025-08-13T10:45:00Z'
+                'status': 'processing'
             }
         })
-        
+
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
