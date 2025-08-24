@@ -20,6 +20,7 @@ from src.routes.admin import admin_bp
 from src.routes.projects import projects_bp
 from src.routes.actors import actors_bp
 from src.routes.videos import videos_bp
+from src.routes.voices import voices_bp   # NEW
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -38,6 +39,7 @@ app.register_blueprint(admin_bp, url_prefix='/api/admin')
 app.register_blueprint(projects_bp, url_prefix='/api/projects')
 app.register_blueprint(actors_bp, url_prefix='/api/actors')
 app.register_blueprint(videos_bp, url_prefix='/api/videos')
+app.register_blueprint(voices_bp, url_prefix='/api/voices')   # NEW
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
