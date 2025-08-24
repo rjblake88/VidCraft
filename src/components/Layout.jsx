@@ -41,10 +41,10 @@ const Layout = ({ children, currentPage, onNavigate, user, onLogout }) => {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-sm transform transition-transform duration-300 ease-in-out lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-border">
+        <div className="flex items-center justify-between h-16 px-6 shadow-sm">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
@@ -72,7 +72,7 @@ const Layout = ({ children, currentPage, onNavigate, user, onLogout }) => {
                   currentPage === item.page 
                     ? 'bg-primary text-primary-foreground' 
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
+                } border-none`}
                 onClick={() => {
                   onNavigate(item.page)
                   setSidebarOpen(false)
@@ -85,7 +85,7 @@ const Layout = ({ children, currentPage, onNavigate, user, onLogout }) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center">
               <span className="text-sm font-medium text-white">
