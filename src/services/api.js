@@ -1,10 +1,15 @@
 // API service for connecting frontend to backend
 import axios from 'axios'
 
-// Prefer value from Vite env; fall back to production URL
-const API_BASE_URL =
-  (import.meta?.env?.VITE_API_BASE_URL) ||
-  'https://9yhyi3c8539k.manus.space/api'
+// Resolve base URL
+const envBase = import.meta?.env?.VITE_API_BASE_URL?.replace(/\/+$/, '')
+const isLocal =
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+// Priority:
+// 1. Explicit Vite env variable
+// 2. Local dev backend when running on localhost
+// 3. Relative /api for production deployments served behind the same host
+const API_BASE_URL = envBase || (isLocal ? 'http://localhost:5002/api' : '/api')
 
 class ApiService {
   constructor() {
