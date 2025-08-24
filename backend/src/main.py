@@ -3,6 +3,10 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# Load environment variables from a `.env` file (if present) before any config that might use them
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from src.models.user import db

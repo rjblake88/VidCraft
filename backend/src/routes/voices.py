@@ -1,4 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+import os
+import requests
+from datetime import datetime
+from pathlib import Path
+
+ELEVEN_API_BASE = 'https://api.elevenlabs.io/v1'
+ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY')
 
 voices_bp = Blueprint('voices', __name__)
 
@@ -6,6 +13,40 @@ voices_bp = Blueprint('voices', __name__)
 def get_voices():
     """Get available voices"""
     try:
+        if ELEVENLABS_API_KEY:
+            try:
+                r = requests.get(f"{ELEVEN_API_BASE}/voices", headers={'xi-api-key': ELEVENLABS_API_KEY})
+                if r.ok:
+                    payload = r.json()
+                    items = payload.get('voices') or []
+                    mapped = []
+                    for v in items:
+                        mapped.append({
+                            'id': v.get('voice_id') or v.get('id'),
+                            'name': v.get('name'),
+                            'language': 'English',
+                            'accent': '',
+                            'gender': '',
+                            'age_range': '',
+                            'style': '',
+                            'description': v.get('description') or '',
+                            'sample_url': v.get('preview_url') or '',
+                            'quality_rating': None,
+                            'usage_count': None
+                        })
+                    return jsonify({
+                        'success': True,
+                        'data': {
+                            'voices': mapped,
+                            'total_count': len(mapped),
+                            'filters': {'genders': [], 'accents': [], 'styles': [], 'languages': []},
+                            'pagination': {'page': 1, 'limit': 50, 'total': len(mapped), 'total_pages': 1},
+                        }
+                    })
+            except Exception as ex:
+                if current_app:
+                    current_app.logger.error(f"ElevenLabs voices fetch failed: {ex}")
+
         # Mock voices data for demo
         mock_voices = [
             {
@@ -196,19 +237,25 @@ def generate_voice():
                     'message': f'Missing required field: {field}'
                 }), 400
         
-        # Mock voice generation - in production, this would call ElevenLabs API
-        audio_id = f"audio_{int(datetime.utcnow().timestamp())}"
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'audio_id': audio_id,
-                'audio_url': f'https://demo-audio.elevenlabs.io/{audio_id}.mp3',
-                'duration': len(data['text']) * 0.1,  # Mock duration calculation
-                'voice_id': data['voice_id'],
-                'text': data['text']
-            }
-        })
+        if not ELEVENLABS_API_KEY:
+            return jsonify({'success': False, 'message': 'ELEVENLABS_API_KEY not set on server'}), 400
+        endpoint = f"{ELEVEN_API_BASE}/text-to-speech/{data['voice_id']}/stream"
+        headers = {'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json'}
+        payload = {'text': data['text'], 'model_id': data.get('model_id', 'eleven_monolingual_v1')}
+        if data.get('voice_settings'):
+            payload['voice_settings'] = data['voice_settings']
+        resp = requests.post(endpoint, headers=headers, json=payload, stream=True)
+        if not resp.ok:
+            return jsonify({'success': False, 'message': resp.text}), resp.status_code
+        static_dir = (Path(__file__).resolve().parent.parent / 'static').resolve()
+        audio_dir = static_dir / 'audio'
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"tts_{int(datetime.utcnow().timestamp())}_{data['voice_id']}.mp3"
+        with open(audio_dir / filename, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        return jsonify({'success': True, 'data': {'audio_id': filename[:-4], 'audio_url': f"/audio/{filename}", 'duration': None, 'voice_id': data['voice_id'], 'text': data['text']}})
         
     except Exception as e:
         return jsonify({
@@ -250,4 +297,3 @@ def clone_voice():
             'success': False,
             'message': str(e)
         }), 500
-
