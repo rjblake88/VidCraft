@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { Badge } from '@/components/ui/badge.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx';
+import api from '@/services/api.js';
 import { 
   Search, 
   Play, 
@@ -27,6 +28,7 @@ const VoiceLibrary = () => {
   const [favorites, setFavorites] = useState([]);
   const [playingVoice, setPlayingVoice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     fetchVoices();
@@ -35,9 +37,39 @@ const VoiceLibrary = () => {
   const fetchVoices = async () => {
     try {
       setLoading(true);
-      
-      // Professional voice library for video generation
-      const mockVoices = [
+
+      // Attempt to fetch from backend (ElevenLabs proxy)
+      let backendVoices = [];
+      try {
+        const res = await api.getVoices();
+        backendVoices = res?.data?.voices ?? [];
+      } catch (e) {
+        console.error('Backend voices fetch failed, falling back to mock', e);
+      }
+
+      if (backendVoices.length) {
+        const mapped = backendVoices.map((v, idx) => ({
+          id: v.id || idx,
+          name: v.name || 'Voice',
+          description: v.description || 'Professional AI voice',
+          category: 'professional',
+          gender: (v.gender || '').toLowerCase() || 'female',
+          age: 'Adult',
+          accent: v.accent || '',
+          language: v.language || 'English',
+          style: v.style || 'General',
+          sample_url: v.sample_url || v.preview_audio_url || '',
+          rating: 4.8,
+          usage_count: v.usage_count || 0,
+          duration: '',
+          tags: [],
+          premium: false,
+          clone_available: false,
+        }));
+        setVoices(mapped);
+      } else {
+        // Mock list if backend empty/unavailable
+        const mockVoices = [
         {
           id: 1,
           name: "Emma Watson",
@@ -148,7 +180,8 @@ const VoiceLibrary = () => {
         }
       ];
 
-      setVoices(mockVoices);
+        setVoices(mockVoices);
+      }
     } catch (error) {
       console.error('Error fetching voices:', error);
     } finally {
@@ -183,12 +216,30 @@ const VoiceLibrary = () => {
   };
 
   const togglePlayback = (voiceId) => {
+    const voice = voices.find(v => v.id === voiceId);
+    if (!voice?.sample_url) return;
+
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.onended = () => setPlayingVoice(null);
+    }
+
+    // If clicking same voice that's playing -> pause/stop
     if (playingVoice === voiceId) {
+      audioRef.current.pause();
       setPlayingVoice(null);
-    } else {
+      return;
+    }
+
+    // Start new playback
+    try {
+      audioRef.current.pause();
+      audioRef.current.src = voice.sample_url;
+      audioRef.current.load();
+      audioRef.current.play().catch(() => {});
       setPlayingVoice(voiceId);
-      // In a real app, this would play the actual voice sample
-      setTimeout(() => setPlayingVoice(null), 3000); // Auto-stop after 3 seconds
+    } catch (e) {
+      console.error('Audio playback error', e);
     }
   };
 
