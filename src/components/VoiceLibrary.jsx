@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog.jsx';
+import { Textarea } from '@/components/ui/textarea.jsx';
 import api from '@/services/api.js';
 
 // Base URL for backend API (used for proxying preview audio)
@@ -35,6 +37,12 @@ const VoiceLibrary = () => {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef(null);
   const [generatingId, setGeneratingId] = useState(null); // track voice currently generating
+  const [ttsOpen, setTtsOpen] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState(null);
+  const [ttsText, setTtsText] = useState('Write your script here...');
+  const [ttsGenerating, setTtsGenerating] = useState(false);
+  const ttsAudioRef = useRef(null);
+  const [ttsAudioUrl, setTtsAudioUrl] = useState('');
 
   useEffect(() => {
     fetchVoices();
@@ -248,6 +256,29 @@ const VoiceLibrary = () => {
     }
   };
 
+  const generateTTS = async () => {
+    if (!ttsVoice || !ttsText?.trim()) return;
+    setTtsGenerating(true);
+    try {
+      const resp = await api.generateVoice({ text: ttsText.trim(), voice_id: ttsVoice.id });
+      if (resp?.success && resp?.data?.audio_url_absolute) {
+        setTtsAudioUrl(resp.data.audio_url_absolute);
+        if (!ttsAudioRef.current) ttsAudioRef.current = new Audio();
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.src = resp.data.audio_url_absolute;
+        ttsAudioRef.current.load();
+        await ttsAudioRef.current.play().catch(() => {});
+      } else {
+        alert(resp?.message || 'Failed to generate audio.');
+      }
+    } catch(e) {
+      console.error('TTS generation failed', e);
+      alert('TTS generation failed.');
+    } finally {
+      setTtsGenerating(false);
+    }
+  };
+
   const handleSelectVoice = async (voice) => {
     // Generate a short TTS sample so the user hears the selected voice in action
     setGeneratingId(voice.id);
@@ -457,10 +488,9 @@ const VoiceLibrary = () => {
                     <Button 
                       size="sm" 
                       className="flex-1 gradient-bg text-white hover:opacity-90"
-                      onClick={() => handleSelectVoice(voice)}
-                      disabled={!!generatingId}
+                      onClick={() => { setTtsVoice(voice); setTtsOpen(true); setTtsAudioUrl(''); }}
                     >
-                      {generatingId === voice.id ? 'Generating…' : 'Select'}
+                      Use Voice
                     </Button>
                     {voice.clone_available && (
                       <Button 
@@ -505,9 +535,29 @@ const VoiceLibrary = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* TTS Dialog */}
+      <Dialog open={ttsOpen} onOpenChange={setTtsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Use Voice {ttsVoice?.name ? `— ${ttsVoice.name}` : ''}</DialogTitle>
+            <DialogDescription>Type what you want this voice to say, then generate real audio.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Textarea rows={5} value={ttsText} onChange={(e) => setTtsText(e.target.value)} />
+            {ttsAudioUrl && (
+              <audio controls src={ttsAudioUrl} className="w-full" />
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={generateTTS} className="gradient-bg text-white" disabled={ttsGenerating}>
+              {ttsGenerating ? 'Generating…' : 'Generate audio'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default VoiceLibrary;
-
