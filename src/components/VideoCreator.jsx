@@ -64,6 +64,20 @@ const VideoCreator = () => {
       const voicesResponse = await apiService.getVoices()
       if (voicesResponse.success) {
         setVoices(voicesResponse.data.voices)
+
+        // If user previously chose a default voice in Voice Library, pre-select it
+        try {
+          const localDefault = localStorage.getItem('defaultVoiceId')
+          if (
+            localDefault &&
+            Array.isArray(voicesResponse.data.voices) &&
+            voicesResponse.data.voices.some((v) => v.id === localDefault)
+          ) {
+            setSelectedVoice(localDefault)
+          }
+        } catch {
+          /* localStorage may be unavailable (e.g., privacy mode) – ignore */
+        }
       }
 
     } catch (error) {

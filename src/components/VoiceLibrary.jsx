@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog.jsx';
 import { Textarea } from '@/components/ui/textarea.jsx';
+import { Slider } from '@/components/ui/slider.jsx';
 import api from '@/services/api.js';
 
 // Base URL for backend API (used for proxying preview audio)
@@ -44,6 +45,9 @@ const VoiceLibrary = () => {
   const [ttsGenerating, setTtsGenerating] = useState(false);
   const ttsAudioRef = useRef(null);
   const [ttsAudioUrl, setTtsAudioUrl] = useState('');
+  const [stability, setStability] = useState([0.55]);
+  const [clarity, setClarity] = useState([0.75]);
+  const [defaultSaved, setDefaultSaved] = useState(false);
 
   useEffect(() => {
     fetchVoices();
@@ -261,7 +265,11 @@ const VoiceLibrary = () => {
     if (!ttsVoice || !ttsText?.trim()) return;
     setTtsGenerating(true);
     try {
-      const resp = await api.generateVoice({ text: ttsText.trim(), voice_id: ttsVoice.id });
+      const resp = await api.generateVoice({
+        text: ttsText.trim(),
+        voice_id: ttsVoice.id,
+        voice_settings: { stability: stability[0], similarity_boost: clarity[0] }
+      });
       if (resp?.success && resp?.data?.audio_url_absolute) {
         setTtsAudioUrl(resp.data.audio_url_absolute);
         if (!ttsAudioRef.current) ttsAudioRef.current = new Audio();
@@ -277,6 +285,17 @@ const VoiceLibrary = () => {
       alert('TTS generation failed.');
     } finally {
       setTtsGenerating(false);
+    }
+  };
+
+  const setAsDefaultVoice = () => {
+    if (!ttsVoice) return;
+    try {
+      localStorage.setItem('defaultVoiceId', ttsVoice.id);
+      localStorage.setItem('defaultVoiceName', ttsVoice.name || '');
+      setDefaultSaved(true);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -494,6 +513,10 @@ const VoiceLibrary = () => {
                         setTtsText('');          // clear textarea on open
                         setTtsOpen(true);
                         setTtsAudioUrl('');
+                        // reset sliders & default flag each time modal opens
+                        setStability([0.55]);
+                        setClarity([0.75]);
+                        setDefaultSaved(false);
                       }}
                     >
                       Use Voice
@@ -549,18 +572,44 @@ const VoiceLibrary = () => {
             <DialogTitle>Use Voice {ttsVoice?.name ? `— ${ttsVoice.name}` : ''}</DialogTitle>
             <DialogDescription>Type what you want this voice to say, then generate real audio.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Textarea
               rows={5}
               value={ttsText}
               onChange={(e) => setTtsText(e.target.value)}
               placeholder="Write your script here..."
             />
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span>Stability</span>
+                  <span>{stability[0].toFixed(2)}</span>
+                </div>
+                <Slider value={stability} onValueChange={setStability} max={1} min={0} step={0.01} />
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span>Clarity</span>
+                  <span>{clarity[0].toFixed(2)}</span>
+                </div>
+                <Slider value={clarity} onValueChange={setClarity} max={1} min={0} step={0.01} />
+              </div>
+            </div>
             {ttsAudioUrl && (
               <audio controls src={ttsAudioUrl} className="w-full" />
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex items-center gap-2">
+            <div className="flex-1 text-left space-x-2">
+              <Button variant="outline" onClick={setAsDefaultVoice} disabled={!ttsVoice}>
+                {defaultSaved ? 'Default set' : 'Set as default voice'}
+              </Button>
+              {ttsAudioUrl && (
+                <a href={ttsAudioUrl} download className="inline-block">
+                  <Button variant="outline">Download</Button>
+                </a>
+              )}
+            </div>
             <Button onClick={generateTTS} className="gradient-bg text-white" disabled={ttsGenerating}>
               {ttsGenerating ? 'Generating…' : 'Generate audio'}
             </Button>
