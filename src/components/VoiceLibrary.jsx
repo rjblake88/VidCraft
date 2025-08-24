@@ -39,7 +39,8 @@ const VoiceLibrary = () => {
   const [generatingId, setGeneratingId] = useState(null); // track voice currently generating
   const [ttsOpen, setTtsOpen] = useState(false);
   const [ttsVoice, setTtsVoice] = useState(null);
-  const [ttsText, setTtsText] = useState('Write your script here...');
+  // empty by default – placeholder handles helper text
+  const [ttsText, setTtsText] = useState('');
   const [ttsGenerating, setTtsGenerating] = useState(false);
   const ttsAudioRef = useRef(null);
   const [ttsAudioUrl, setTtsAudioUrl] = useState('');
@@ -488,7 +489,12 @@ const VoiceLibrary = () => {
                     <Button 
                       size="sm" 
                       className="flex-1 gradient-bg text-white hover:opacity-90"
-                      onClick={() => { setTtsVoice(voice); setTtsOpen(true); setTtsAudioUrl(''); }}
+                      onClick={() => {
+                        setTtsVoice(voice);
+                        setTtsText('');          // clear textarea on open
+                        setTtsOpen(true);
+                        setTtsAudioUrl('');
+                      }}
                     >
                       Use Voice
                     </Button>
@@ -544,7 +550,12 @@ const VoiceLibrary = () => {
             <DialogDescription>Type what you want this voice to say, then generate real audio.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Textarea rows={5} value={ttsText} onChange={(e) => setTtsText(e.target.value)} />
+            <Textarea
+              rows={5}
+              value={ttsText}
+              onChange={(e) => setTtsText(e.target.value)}
+              placeholder="Write your script here..."
+            />
             {ttsAudioUrl && (
               <audio controls src={ttsAudioUrl} className="w-full" />
             )}
