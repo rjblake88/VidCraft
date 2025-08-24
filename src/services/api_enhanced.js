@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://9yhyi3c8539k.manus.space/api';
+// Prefer value from Vite env during development, fall back to production URL
+const API_BASE_URL =
+  (import.meta?.env?.VITE_API_BASE_URL) ||
+  'https://9yhyi3c8539k.manus.space/api';
 
 class ApiService {
   constructor() {
