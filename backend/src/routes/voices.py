@@ -255,7 +255,19 @@ def generate_voice():
             for chunk in resp.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
-        return jsonify({'success': True, 'data': {'audio_id': filename[:-4], 'audio_url': f"/audio/{filename}", 'duration': None, 'voice_id': data['voice_id'], 'text': data['text']}})
+        # build absolute url so frontend on different origin can stream audio directly
+        base = request.host_url.rstrip('/')
+        return jsonify({
+            'success': True,
+            'data': {
+                'audio_id': filename[:-4],
+                'audio_url': f"/audio/{filename}",
+                'audio_url_absolute': f"{base}/audio/{filename}",
+                'duration': None,
+                'voice_id': data['voice_id'],
+                'text': data['text']
+            }
+        })
         
     except Exception as e:
         return jsonify({
