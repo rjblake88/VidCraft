@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
+from flask import Response
 import os
+from urllib.parse import urlparse
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -177,6 +179,52 @@ def get_voices():
             'success': False,
             'message': str(e)
         }), 500
+
+# ---------------------------------------------------------------------------
+# Preview proxy – stream remote ElevenLabs sample audio to workaround CORS
+# ---------------------------------------------------------------------------
+
+@voices_bp.route('/preview', methods=['GET'])
+def preview_proxy():
+    """
+    Proxy remote preview audio files (e.g. ElevenLabs samples) so the frontend
+    can fetch them from the same origin and avoid CORS / mixed-content issues.
+
+    Query params:
+        url – full HTTPS URL of the audio file to proxy
+    """
+    try:
+        url = request.args.get('url')
+        if not url:
+            return jsonify({'success': False, 'message': 'Missing url parameter'}), 400
+
+        parsed = urlparse(url)
+
+        # Allow only known safe hosts to mitigate open proxy abuse
+        allowed_hosts = {
+            'storage.googleapis.com',
+            'eleven-public-prod.storage.googleapis.com',
+            'cdn.elevenlabs.io',
+            'api.elevenlabs.io',
+            'elevenlabs.io',
+        }
+        if parsed.hostname not in allowed_hosts and not parsed.hostname.endswith('googleapis.com'):
+            return jsonify({'success': False, 'message': 'Host not allowed'}), 400
+
+        r = requests.get(url, stream=True, timeout=30)
+        if not r.ok:
+            return jsonify({'success': False, 'message': f'Upstream error: {r.status_code}'}), r.status_code
+
+        def generate():
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+
+        content_type = r.headers.get('Content-Type', 'audio/mpeg')
+        return Response(generate(), content_type=content_type)
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @voices_bp.route('/<voice_id>', methods=['GET'])
 def get_voice(voice_id):

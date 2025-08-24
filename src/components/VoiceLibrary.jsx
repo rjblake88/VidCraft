@@ -5,6 +5,11 @@ import { Badge } from '@/components/ui/badge.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx';
 import api from '@/services/api.js';
+
+// Base URL for backend API (used for proxying preview audio)
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') ||
+  'http://localhost:5002/api';
 import { 
   Search, 
   Play, 
@@ -235,7 +240,11 @@ const VoiceLibrary = () => {
     // Start new playback
     try {
       audioRef.current.pause();
-      audioRef.current.src = voice.sample_url;
+      // Use backend proxy to avoid CORS / mixed-content issues
+      const proxied = `${API_BASE}/voices/preview?url=${encodeURIComponent(
+        voice.sample_url
+      )}`;
+      audioRef.current.src = proxied;
       audioRef.current.load();
       audioRef.current.play().catch(() => {});
       setPlayingVoice(voiceId);
